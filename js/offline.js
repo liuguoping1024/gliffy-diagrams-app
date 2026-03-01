@@ -1022,11 +1022,7 @@
         b.send("getLocalStorage", [c, "gliffyDesktop"], function (f) {
           d.__hideTips = f[c] || false;
           var e = f.gliffyDesktop || {};
-          if (e.registered) {
-            d.__showTips();
-          } else {
-            d.__showRegister(e);
-          }
+          d.__showTips();
         });
       },
       __sendDesktopData: function (d) {

@@ -24,7 +24,7 @@ Alternatively, install via the MSI installer from [Releases](https://github.com/
 
 - Offline diagram editor — works without internet
 - Lightweight (~13 MB) native desktop app
-- Based on the original Gliffy Diagrams Chrome extension (v1.0.32)
+- Based on the original Gliffy Diagrams Chrome extension (v1.0.36)
 
 ## Acknowledgements
 
@@ -32,4 +32,4 @@ Alternatively, install via the MSI installer from [Releases](https://github.com/
 
 ## Version
 
-1.0.32
+1.0.36

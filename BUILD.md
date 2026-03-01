@@ -34,7 +34,7 @@ pnpm install
 ```powershell
 # 在项目根目录执行
 Remove-Item -Recurse -Force "download\Pake-main\dist\*"
-Copy-Item -Path "download\Gliffy Diagrams 1.0.32\*" -Destination "download\Pake-main\dist" -Recurse -Force
+Copy-Item -Path "download\Gliffy Diagrams 1.0.36\*" -Destination "download\Pake-main\dist" -Recurse -Force
 ```
 
 ### 3. 编译
@@ -47,7 +47,7 @@ npx --yes @tauri-apps/cli build --config "src-tauri/.pake/tauri.conf.json" --fea
 
 产物位置：
 - **exe**：`download\Pake-main\src-tauri\target\release\pake.exe`
-- **MSI**：`download\Pake-main\src-tauri\target\release\bundle\msi\Gliffy Diagrams_1.0.32_x64_en-US.msi`
+- **MSI**：`download\Pake-main\src-tauri\target\release\bundle\msi\Gliffy Diagrams_1.0.36_x64_en-US.msi`
 
 ### 4. 输出
 
@@ -55,13 +55,13 @@ npx --yes @tauri-apps/cli build --config "src-tauri/.pake/tauri.conf.json" --fea
 
 ## 已对 Gliffy 做的修改
 
-相对于原始 Chrome 扩展（v1.0.32），做了以下改动：
+相对于原始 Chrome 扩展（v1.0.36），做了以下改动：
 
 ### 路径修正
 - `index.html`、`editor.html`：`/css/...`、`/js/...` 改为相对路径 `css/...`、`js/...`，使其在 Tauri 本地协议下正常加载
 
 ### Chrome API Polyfill（内联在 index.html 中）
-- **`chrome.runtime.getManifest()`**：返回 `{ version: "1.0.32" }`
+- **`chrome.runtime.getManifest()`**：返回 `{ version: "1.0.36" }`
 - **`chrome.i18n.getMessage()`**：返回启动画面文案 "Loading..."
 - **`chrome.storage.local.get/set`**：用内存对象模拟，支持 Gliffy 的 getLocalStorage / ready 流程
 - **Splash fallback**：2.5s / 5s 后强制隐藏启动画面，防止因联网请求失败导致永远卡在 Loading
@@ -77,7 +77,7 @@ npx --yes @tauri-apps/cli build --config "src-tauri/.pake/tauri.conf.json" --fea
 关键配置位于 `download\Pake-main\src-tauri\.pake\`：
 
 - **`pake.json`**：窗口配置，`url_type: "local"`，入口 `index.html`
-- **`tauri.conf.json`**：产品名 "Gliffy Diagrams"，版本 1.0.32，图标路径
+- **`tauri.conf.json`**：产品名 "Gliffy Diagrams"，版本 1.0.36，图标路径
 
 ## 在 Chrome 中调试
 
