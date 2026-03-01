@@ -10,6 +10,8 @@
 
 # Gliffy Diagrams App
 
+[English](README.md)
+
 基于 [Pake](https://github.com/tw93/Pake)（Tauri）打包的 Gliffy Diagrams 独立桌面应用，无需 Chrome 或浏览器扩展。
 
 ## 使用方式
@@ -23,6 +25,10 @@
 - 离线绘图编辑器 — 无需联网即可使用
 - 轻量级原生桌面应用（约 13 MB）
 - 基于原版 Gliffy Diagrams Chrome 扩展（v1.0.32）
+
+## 特别鸣谢
+
+- [Pake](https://github.com/tw93/Pake) — 基于 Tauri 的轻量级网页打包桌面应用工具，本项目的核心依赖。
 
 ## 版本
 
