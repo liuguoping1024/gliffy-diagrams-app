@@ -1,0 +1,11 @@
+{
+    "APP_NAME" : {
+        "message" : "Gliffy Diagrams"
+    },
+    "TAG_LINE" : {
+        "message" : "Diagrams Made Easy"
+    },
+    "DESKTOP_SPLASH_LOADING" : {
+        "message" : "loading..."
+    }
+}
