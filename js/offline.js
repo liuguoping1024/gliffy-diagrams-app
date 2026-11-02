@@ -974,15 +974,20 @@
     GliffyApp.SaveDialogController = GliffyApp.SaveDialogController.extend({
       show: function () {
         var c = this,
-          d = this.__editor.getDocumentManager().getActiveDocument().getUrls()
-            .tempId;
+          g = this.__editor.getDocumentManager().getActiveDocument(),
+          d = g.getUrls().tempId;
         b.send(
           "promptSaveAs",
-          null,
+          { title: g.getTitle() },
           function (e) {
             if (e.cancelled) {
+              if (g.revisionBeforeSaveAs) {
+                g.setCurrentRevision(g.revisionBeforeSaveAs);
+              }
+              g.revisionBeforeSaveAs = null;
               c.cancelSave();
             } else {
+              g.revisionBeforeSaveAs = null;
               e.urls.tempId = d;
               c.__editor
                 .getDocumentManager()
@@ -992,7 +997,7 @@
             }
           },
           function (e, f) {
-            this.showErrorMessage(f);
+            c.showErrorMessage(f);
           }
         );
       },
@@ -1515,10 +1520,9 @@
           });
         }
         this.onMenuClick(b, "gliffy-toolbar-menu-file", false);
-        GLIFFY.editor
-          .getDocumentManager()
-          .getActiveDocument()
-          .setCurrentRevision(0);
+        var c = GLIFFY.editor.getDocumentManager().getActiveDocument();
+        c.revisionBeforeSaveAs = c.getCurrentRevision();
+        c.setCurrentRevision(0);
         GLIFFY.editor.save();
       },
     });
@@ -1929,9 +1933,7 @@
             null,
             function (p) {
               if (p !== null) {
-                if (
-                  h.getDocumentManager().getActiveDocument().isNewNotDirty()
-                ) {
+                confirmDiscardChanges(function () {
                   h.open({
                     url: p,
                     scale: 1,
@@ -1941,9 +1943,7 @@
                       );
                     },
                   });
-                } else {
-                  o.send("newWindow", p);
-                }
+                });
               }
             },
             function (p, q) {
@@ -1973,7 +1973,9 @@
         ]);
       },
       handleFileNew: function () {
-        o.send("newWindow", null);
+        confirmDiscardChanges(function () {
+          o.send("newWindow", null);
+        });
       },
       create: function (q, p, r) {
         GliffyApp.set("documentModel", GliffyApp.DocumentModel.create());
@@ -2024,7 +2026,7 @@
                 dismiss: true,
               },
               {
-                text: $.i18n._("TABDIALOG_CLOSE_TAB"),
+                text: "Discard Changes",
                 callback: function (t) {
                   if (s.analyticsEnabled) {
                     GLIFFY.Utils.analyticsEvent("trackEvent", {
@@ -2105,6 +2107,33 @@
         image: "images/gif/tips/drawing-guides.gif",
       },
     ];
+
+    // The app has one window: opening or creating a document replaces the current
+    // one, so unsaved work needs a confirmation and its draft must go with it.
+    function confirmDiscardChanges(p) {
+      var q = h.getDocumentManager().getActiveDocument(),
+        r = function () {
+          o.send("discardAutosave", { urls: q.getUrls() }, p);
+        };
+      if (h.unsavedChanges()) {
+        GLIFFY.Dialog.showYesNoDialog({
+          title: $.i18n._("TABDIALOG_CONFIRM_NAVIGATION"),
+          content: $.i18n._("TABDIALOG_UNSAVED_CHANGES", [q.getTitle()]),
+          cancelCallback: null,
+          buttons: [
+            {
+              text: $.i18n._("TABDIALOG_CONTINUE_WORKING"),
+              callback: null,
+              primary: false,
+              dismiss: true,
+            },
+            { text: "Discard Changes", callback: r, primary: true, dismiss: true },
+          ],
+        });
+      } else {
+        r();
+      }
+    }
 
     function d(p) {
       if (GLIFFY.editor.analyticsEnabled && p.launchCount === 1) {
@@ -2244,24 +2273,15 @@
         $.i18n._("DESKTOP_SAVE_AS_PNG")
       );
       $("#gliffy-desktop-draft-notice .discard-btn").click(function (p) {
-        o.send("getLocalStorage", "windowSettings", function (q) {
-          if (q.windowSettings && q.windowSettings.count === 1) {
-            o.send("newWindow", null, function () {
-              o.send(
-                "close",
-                GLIFFY.editor
-                  .getDocumentManager()
-                  .getActiveDocument()
-                  .toObject()
-              );
-            });
-          } else {
-            o.send(
-              "close",
-              GLIFFY.editor.getDocumentManager().getActiveDocument().toObject()
-            );
+        o.send(
+          "discardAutosave",
+          {
+            urls: GLIFFY.editor.getDocumentManager().getActiveDocument().getUrls(),
+          },
+          function () {
+            o.send("newWindow", null);
           }
-        });
+        );
       });
       $("#gliffy-desktop-draft-notice .continue-btn").click(function (p) {
         $("#gliffy-desktop-draft-notice").hide();

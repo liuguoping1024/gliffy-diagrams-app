@@ -1,93 +1,77 @@
 # Gliffy Diagrams 桌面应用 — 构建说明
 
-本项目用 [Pake](https://github.com/tw93/Pake)（基于 Tauri）把原 Chrome 商店的 Gliffy Diagrams 扩展打包成 Windows 桌面应用，不依赖 Chrome 或扩展商店。
-
-## 构建思路
-
-1. 将 Gliffy Chrome 扩展的前端文件（HTML/CSS/JS）放入 Pake 的 `src-tauri/../dist` 目录
-2. 配置 `pake.json` 为 `url_type: "local"`，入口指向 `index.html`
-3. 运行 `tauri build --features cli-build`，Tauri 会将所有前端资源编译进 exe
-
-> **注意**：Tauri 在编译时把前端嵌入 exe，修改 exe 同目录的文件不会生效，必须重新编译。
+本项目把原 Chrome 商店的 Gliffy Diagrams 前端打包成 Windows 桌面应用。构建所需的一切都在本仓库里，改过的 Pake 内嵌在 [`pake/`](pake/README.md) 目录。
 
 ## 环境要求
 
-- **Node.js** >= 18（推荐 22+）
-- **Rust** >= 1.85（首次会自动安装）
-- **pnpm**（版本不限，设 `COREPACK_ENABLE_STRICT=0` 可绕过版本检查）
-- **Windows**：首次编译约需 10–15 分钟
+- **Node.js** >= 20
+- **rustup**：首次构建时会自动安装 [`pake/rust-toolchain.toml`](pake/rust-toolchain.toml) 指定的 Rust 版本
+- **WebView2 运行时**：Windows 10/11 通常已自带
 
-## 构建步骤
+不需要 pnpm，也不需要单独安装 Tauri CLI 或 Pake CLI。
 
-### 1. 安装依赖
+## 构建
+
+在项目根目录执行：
 
 ```powershell
-cd download\Pake-main
-$env:COREPACK_ENABLE_STRICT="0"
-pnpm install
+.\build.ps1        # 便携版：release\gliffy-diagrams.exe
+.\build.ps1 -Msi   # 另外生成 MSI 安装包，也在 release\ 下
 ```
 
-### 2. 准备前端资源
+首次编译约 10 分钟，之后再编译通常要几分钟。脚本做两件事：
 
-将修改后的 Gliffy 文件复制到 Pake 的 dist 目录：
+1. 把前端文件复制到 `pake\dist`（构建时生成，不纳入版本管理）
+2. 运行 `tauri build --locked`，把前端嵌入 exe
 
-```powershell
-# 在项目根目录执行
-Remove-Item -Recurse -Force "download\Pake-main\dist\*"
-Copy-Item -Path "download\Gliffy Diagrams 1.0.36\*" -Destination "download\Pake-main\dist" -Recurse -Force
-```
+> **注意**：前端是编译进 exe 的，修改 `js/` 等文件后必须重新构建才会生效。
 
-### 3. 编译
+## 项目结构
 
-```powershell
-cd download\Pake-main
-$env:COREPACK_ENABLE_STRICT="0"
-npx --yes @tauri-apps/cli build --config "src-tauri/.pake/tauri.conf.json" --features cli-build
-```
+| 路径 | 说明 |
+|---|---|
+| `index.html`、`js/polyfill.js` | 外层页面和 Chrome API 兼容层 |
+| `editor.html`、`js/editor.js`、`js/offline.js` | Gliffy 编辑器（运行在 iframe 中） |
+| `js/app.js`、`js/desktopCommon.js` | 外层页面的动作处理和文件读写 |
+| `pake/` | 内嵌的 Pake，改动清单见 [pake/README.md](pake/README.md) |
 
-产物位置：
-- **exe**：`download\Pake-main\src-tauri\target\release\pake.exe`
-- **MSI**：`download\Pake-main\src-tauri\target\release\bundle\msi\Gliffy Diagrams_1.0.36_x64_en-US.msi`
+## 相对原版 Chrome 应用的改动
 
-### 4. 输出
+**文件操作**
+- `chrome.fileSystem` 由 `js/polyfill.js` 实现，通过 Tauri 命令调用原生对话框和文件读写
+- 原生命令只能读写用户在对话框里选过的文件；保存时先写临时文件再替换，中途失败不会损坏原文件
+- 保存失败会提示具体原因，不再卡死界面
 
-将 `pake.exe` 复制到 `Gliffy Diagrams App\` 即可作为便携版使用。MSI 可直接分发安装。
+**单窗口**
+- 只有一个窗口：打开或新建会替换当前文档，有未保存内容时先询问
+- 帮助和 EULA 页面在窗口内以覆盖层显示
+- 关闭窗口时如有未保存内容会询问；如果页面无响应，2 秒后直接退出
 
-## 已对 Gliffy 做的修改
+**自动保存**
+- 崩溃或被强制结束后，下次启动恢复最新的草稿，顶部显示提示，可以继续或丢弃
+- 恢复的草稿保存时会弹出另存为，不会直接覆盖原文件
 
-相对于原始 Chrome 扩展（v1.0.36），做了以下改动：
+**右键菜单**
+- 关闭了 Pake 注入的右键菜单，它会顶替 Gliffy 自己的菜单
+- 选中多个图形或一个组时，图形菜单增加对齐和分布
 
-### 路径修正
-- `index.html`、`editor.html`：`/css/...`、`/js/...` 改为相对路径 `css/...`、`js/...`，使其在 Tauri 本地协议下正常加载
+**其他**
+- `index.html`、`editor.html` 使用相对路径
+- 启动时不显示注册对话框（`js/offline.js`）
+- “不再显示提示”的设置会保留；其余 `chrome.storage` 数据只在本次运行期间有效
 
-### Chrome API Polyfill（内联在 index.html 中）
-- **`chrome.runtime.getManifest()`**：返回 `{ version: "1.0.36" }`
-- **`chrome.i18n.getMessage()`**：返回启动画面文案 "Loading..."
-- **`chrome.storage.local.get/set`**：用内存对象模拟，支持 Gliffy 的 getLocalStorage / ready 流程
-- **Splash fallback**：2.5s / 5s 后强制隐藏启动画面，防止因联网请求失败导致永远卡在 Loading
-
-### 移除注册对话框
-- `js/offline.js`：跳过 `__showRegister()`，直接走 `__showTips()` 路径，启动时不再弹出 "Register Gliffy Diagrams" 表单
-
-### 自定义图标
-- 用原始 `gliffy_128.png` 生成 256x256 和 32x32 的 `.ico` 文件，替换默认图标
-
-## 配置文件
-
-关键配置位于 `download\Pake-main\src-tauri\.pake\`：
-
-- **`pake.json`**：窗口配置，`url_type: "local"`，入口 `index.html`
-- **`tauri.conf.json`**：产品名 "Gliffy Diagrams"，版本 1.0.36，图标路径
-
-## 在 Chrome 中调试
-
-如需调试前端问题，可用本地 HTTP 服务在 Chrome 中运行：
+## 在 Chrome 中调试前端
 
 ```powershell
-cd "Gliffy Diagrams App"
 python -m http.server 8765
 ```
 
-然后在 Chrome 中打开 `http://localhost:8765`，按 F12 查看 Console 报错。
+然后打开 `http://localhost:8765`，按 F12 查看报错。这种方式下没有 Tauri：打开文件用浏览器的文件选择框，保存变成下载。
 
-> 注意：Chrome 调试改动的是本地文件，确认无误后需重新执行「准备前端资源 → 编译」才能生效到 exe 中。
+## 常见问题
+
+**`no method named cast` 或其他 `windows-core` 相关错误**：依赖版本漂移了。不要运行 `cargo update`，用 `git checkout pake/src-tauri/Cargo.lock` 恢复锁文件。
+
+**`the 'cargo.exe' binary ... is not applicable`**：Rust 工具链没装完整。运行 `rustup toolchain uninstall 1.95.0`，再重新构建。
+
+**界面窗口没有最大化**：窗口大小记录在 `%APPDATA%\com.gliffy.diagrams\.window-state.json`，删除后恢复默认。

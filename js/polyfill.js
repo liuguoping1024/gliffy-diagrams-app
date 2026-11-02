@@ -8,7 +8,44 @@
   }
 
   // ── chrome.runtime / chrome.i18n / chrome.storage.local ──────────────
+  // Only UI preferences survive a restart; every other chrome.storage value
+  // stays per-launch, which js/app.js and js/offline.js already cope with.
+  var PREFS_KEY = "gliffyPrefs";
+  var PERSISTED_KEYS = ["hideTips"];
   var _storage = {};
+  try {
+    _storage = JSON.parse(localStorage.getItem(PREFS_KEY)) || {};
+  } catch (e) {}
+
+  function _savePrefs() {
+    var prefs = {};
+    PERSISTED_KEYS.forEach(function (key) {
+      if (_storage.hasOwnProperty(key)) prefs[key] = _storage[key];
+    });
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch (e) {}
+  }
+
+  // Removed from current Chromium, but js/desktopCommon.js still reads its codes.
+  if (typeof window.FileError === "undefined") {
+    window.FileError = { NOT_FOUND_ERR: 1, SECURITY_ERR: 2, QUOTA_EXCEEDED_ERR: 10 };
+  }
+
+  function _errorInfo(e) {
+    return { code: 0, message: String((e && e.message) || e) };
+  }
+
+  function _alert(message) {
+    var frame = document.getElementById("editor");
+    var editor = frame && frame.contentWindow.GLIFFY;
+    if (editor && editor.Dialog) {
+      editor.Dialog.showAlertDialog({ content: message, title: "Oops!" });
+    } else {
+      window.alert(message);
+    }
+  }
+
   window.chrome = window.chrome || {};
   chrome.runtime = chrome.runtime || {};
   chrome.i18n = chrome.i18n || {};
@@ -18,7 +55,7 @@
 
   if (typeof chrome.runtime.getManifest !== "function") {
     chrome.runtime.getManifest = function () {
-      return { version: "1.0.36" };
+      return { version: "1.0.37" };
     };
   }
   if (typeof chrome.i18n.getMessage !== "function") {
@@ -46,16 +83,52 @@
     chrome.storage.local.set = function (obj, cb) {
       for (var key in obj)
         if (obj.hasOwnProperty(key)) _storage[key] = obj[key];
+      _savePrefs();
       if (typeof cb === "function") setTimeout(cb, 0);
     };
   }
 
-  // ── chrome.app.window (stub) ─────────────────────────────────────────
+  // ── chrome.app.window ────────────────────────────────────────────────
+  // The app has one native window, so help pages open in an overlay inside it.
   chrome.app = chrome.app || {};
   chrome.app.window = chrome.app.window || {};
   if (typeof chrome.app.window.create !== "function") {
-    chrome.app.window.create = function (_url, _opts, cb) {
-      if (typeof cb === "function") cb(null);
+    chrome.app.window.create = function (url) {
+      var page = /[?&]page=([^&]+)/.exec(url);
+      var overlay = document.createElement("div");
+      overlay.id = "gliffyPageOverlay";
+      overlay.style.cssText =
+        "position:fixed;left:0;top:0;right:0;bottom:0;z-index:100000;background:#fff;display:flex;flex-direction:column;";
+      var close = document.createElement("button");
+      close.textContent = "\u00d7 Close";
+      close.style.cssText = "align-self:flex-end;margin:6px 10px;padding:4px 12px;cursor:pointer;";
+      close.onclick = function () {
+        document.body.removeChild(overlay);
+      };
+      var frame = document.createElement("iframe");
+      frame.src = page ? decodeURIComponent(page[1]) : url;
+      frame.style.cssText = "flex:1;width:100%;border:0;";
+      overlay.appendChild(close);
+      overlay.appendChild(frame);
+      document.body.appendChild(overlay);
+    };
+  }
+
+  // ── Window close ─────────────────────────────────────────────────────
+  // The native close button asks here first (src-tauri/src/app/gliffy.rs).
+  if (_isTauri) {
+    window.close = function () {
+      _invoke("gliffy_exit");
+    };
+    window.__gliffyRequestClose = function () {
+      _invoke("gliffy_close_ack");
+      try {
+        var editor = document.getElementById("editor").contentWindow.GLIFFY.editor;
+        editor.__actions.close(editor.getDocumentManager().getActiveDocument().toObject());
+      } catch (e) {
+        console.error(e);
+        window.close();
+      }
     };
   }
 
@@ -83,7 +156,7 @@
           successCb(blob);
         })
         .catch(function (e) {
-          if (errorCb) errorCb(e);
+          if (errorCb) errorCb(_errorInfo(e));
         });
     } else if (errorCb) {
       errorCb(new Error("No file data"));
@@ -113,8 +186,9 @@
                 if (w.onwriteend) w.onwriteend({});
               })
               .catch(function (e) {
-                w.error = e;
-                if (w.onerror) w.onerror(e);
+                w.error = _errorInfo(e);
+                if (w.onerror) w.onerror(w.error);
+                else _alert(w.error.message);
               });
           };
           reader.readAsArrayBuffer(blob);
@@ -161,21 +235,15 @@
             }
           }
         }
-        _invoke("open_file_dialog", { params: { filters: filters } })
-          .then(function (result) {
-            if (result) {
-              _invoke("read_file_content", { path: result.path })
-                .then(function (bytes) {
-                  var blob = new Blob([new Uint8Array(bytes)], { type: "application/octet-stream" });
-                  var file = new File([blob], result.name, { type: blob.type });
-                  cb(new ShimFileEntry(file, result.name, result.path));
-                })
-                .catch(function () { cb(null); });
-            } else {
-              cb(null);
-            }
-          })
-          .catch(function () { cb(null); });
+        _invoke("open_file_dialog", { params: { filters: filters } }).then(
+          function (result) {
+            cb(result ? new ShimFileEntry(null, result.name, result.path) : null);
+          },
+          function (e) {
+            _alert(_errorInfo(e).message);
+            cb(null);
+          }
+        );
       } else {
         // Fallback: <input type="file">
         var input = document.createElement("input");
@@ -214,7 +282,7 @@
       if (opts.accepts && opts.accepts[0] && opts.accepts[0].extensions) {
         ext = opts.accepts[0].extensions[0];
       }
-      if (ext && suggestedName.indexOf("." + ext) === -1) {
+      if (ext && suggestedName.slice(-(ext.length + 1)).toLowerCase() !== "." + ext) {
         suggestedName += "." + ext;
       }
 
@@ -230,16 +298,20 @@
         }
         _invoke("save_file_dialog", {
           params: { suggestedName: suggestedName, filters: saveFilters },
-        })
-          .then(function (result) {
+        }).then(
+          function (result) {
             if (result) {
               var fileName = result.path.replace(/\\/g, "/").split("/").pop();
               cb(new ShimFileEntry(null, fileName, result.path));
             } else {
               cb(null);
             }
-          })
-          .catch(function () { cb(null); });
+          },
+          function (e) {
+            _alert(_errorInfo(e).message);
+            cb(null);
+          }
+        );
       } else {
         cb(new ShimFileEntry(null, suggestedName));
       }
@@ -395,8 +467,15 @@
 
   IDBDirEntry.prototype.createReader = function () {
     var dirPath = this._path;
+    var done = false;
     return {
       readEntries: function (successCb, errorCb) {
+        // Callers read until they get an empty batch.
+        if (done) {
+          successCb([]);
+          return;
+        }
+        done = true;
         var prefix = dirPath ? dirPath + "/" : "";
         _getIDB().then(function (db) {
           var tx = db.transaction(IDB_STORE, "readonly");
@@ -466,6 +545,28 @@
         .catch(function (e) { if (errCb) errCb(e); });
     };
   }
+
+  // ── Reload keys ──────────────────────────────────────────────────────
+  // WebView2 reloads on F5 and Ctrl+R, which would throw away the open document.
+  function _blockReloadKeys(win) {
+    win.addEventListener(
+      "keydown",
+      function (e) {
+        var key = e.key && e.key.toLowerCase();
+        if (key === "f5" || (e.ctrlKey && key === "r")) e.preventDefault();
+      },
+      true
+    );
+  }
+  _blockReloadKeys(window);
+  document.addEventListener("DOMContentLoaded", function () {
+    var frame = document.getElementById("editor");
+    if (frame) {
+      frame.addEventListener("load", function () {
+        _blockReloadKeys(frame.contentWindow);
+      });
+    }
+  });
 
   // ── Splash screen fallback ──────────────────────────────────────────
   function forceHideSplash() {

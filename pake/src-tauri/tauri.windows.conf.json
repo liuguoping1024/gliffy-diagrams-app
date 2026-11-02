@@ -1,0 +1,15 @@
+{
+  "bundle": {
+    "icon": ["png/gliffy_256.ico", "png/gliffy_32.ico"],
+    "active": true,
+    "resources": ["png/gliffy_32.ico"],
+    "targets": ["msi"],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "wix": {
+        "language": ["en-US"],
+        "template": "assets/main.wxs"
+      }
+    }
+  }
+}

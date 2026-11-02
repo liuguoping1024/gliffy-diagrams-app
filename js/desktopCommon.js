@@ -163,7 +163,10 @@
         case FileError.SECURITY_ERR:
           return "You do not have permissions to do this.";
         default:
-          return "There was an unknown error while trying to write the file.";
+          return (
+            p.message ||
+            "There was an unknown error while trying to write the file."
+          );
       }
     }
     function m(r, p, q, s) {
@@ -245,13 +248,13 @@
           "text/plain",
           function () {
             if (this.error) {
-              t({ error: "Uh oh!" });
+              t({ error: "The file failed to save." });
             } else {
               q.getDocumentInfo(t);
             }
           },
-          function (u) {
-            t({ error: "Uh oh!" });
+          function (u, v) {
+            t({ error: v || "The file failed to save." });
           }
         );
       } catch (s) {
@@ -536,6 +539,8 @@
                 r(u);
               };
               s.readAsText(t);
+            }, function (t) {
+              p(500, t.message || "The file failed to open.");
             });
           }
         },
@@ -684,13 +689,14 @@
           q
         );
       },
-      promptSaveGonFile: function (r, p, q) {
+      promptSaveGonFile: function (r, p, q, t) {
         this.openGonFileHandler(
           "saveFile",
           function (s) {
             s.getDocumentInfo(r);
           },
-          q
+          q,
+          t
         );
       },
       writeGonFile: function (p, s, r) {
@@ -724,12 +730,12 @@
           return null;
         }
       },
-      openGonFileHandler: function (q, s, r) {
+      openGonFileHandler: function (q, s, r, u) {
         var p = h;
         if (q == "saveFile") {
           p = d;
         }
-        chrome.fileSystem.chooseEntry({ type: q, accepts: p }, function (t) {
+        chrome.fileSystem.chooseEntry({ type: q, accepts: p, suggestedName: u }, function (t) {
           if (t) {
             s(new j(t));
           } else {
@@ -800,6 +806,20 @@
             }
           },
           p
+        );
+      },
+      openNewestTempGonDocument: function (r) {
+        GLIFFY.IO.openTempGonDocuments(
+          function (p) {
+            p.sort(function (s, t) {
+              return t.urls.modificationDate - s.urls.modificationDate;
+            });
+            r(p[0] || null);
+          },
+          function (p, q) {
+            console.error(q);
+            r(null);
+          }
         );
       },
       getTempGonFileHandler: function (p, r, q) {

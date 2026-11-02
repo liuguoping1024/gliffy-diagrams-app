@@ -44678,6 +44678,27 @@
           },
           className: "gliffy-context-menu-item-ungroup",
         });
+        contextMenu.push($.contextMenu.separator);
+        $.each(
+          [
+            ["CPROPS_ALIGN_LEFT", "doAlign", "left"],
+            ["CPROPS_ALIGN_CENTER", "doAlign", "center"],
+            ["CPROPS_ALIGN_RIGHT", "doAlign", "right"],
+            ["CPROPS_ALIGN_TOP", "doAlign", "top"],
+            ["CPROPS_ALIGN_MIDDLE", "doAlign", "middle"],
+            ["CPROPS_ALIGN_BOTTOM", "doAlign", "bottom"],
+            ["CPROPS_DISTRIBUTE_HORIZONTAL", "doDistribute", "horizontal"],
+            ["CPROPS_DISTRIBUTE_VERTICAL", "doDistribute", "vertical"],
+          ],
+          function (i, item) {
+            pushToMenu($.i18n._(item[0]), {
+              onclick: function (menuItem, menu) {
+                GliffyApp.contextualPropertiesController[item[1]](item[2]);
+              },
+              className: "gliffy-context-menu-item-arrange",
+            });
+          }
+        );
         return contextMenu;
       },
       beforeContextMenuShow: function (menu) {
@@ -44696,6 +44717,12 @@
           .toggle(isGroupOrSelection);
         $(menu)
           .find(".gliffy-context-menu-item-ungroup")
+          .toggle(isGroupOrSelection);
+        $(menu)
+          .find(".gliffy-context-menu-item-arrange")
+          .toggle(isGroupOrSelection)
+          .first()
+          .prev()
           .toggle(isGroupOrSelection);
         $(menu).find(".gliffy-context-menu-item-lock").toggle(!isLocked);
         $(menu).find(".gliffy-context-menu-item-unlock").toggle(isLocked);
@@ -47972,7 +47999,7 @@
             "gliffy-context-menu-item-stage gliffy-context-menu-item-selectAll",
         });
         stageMenu.push($.contextMenu.separator);
-        pushToMenu($.i18n._("EDITOR_ZOOM_-_FIT_TO_SCREEN"), {
+        pushToMenu("Fit Screen", {
           onclick: function (menuItem, menu) {
             _gliffy.Utils.analyticsEvent("trackEvent", {
               category: "contextMenu",

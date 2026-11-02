@@ -1,0 +1,20 @@
+{
+  "productName": "Gliffy Diagrams",
+  "identifier": "com.gliffy.diagrams",
+  "version": "1.0.37",
+  "app": {
+    "withGlobalTauri": true,
+    "trayIcon": {
+      "iconPath": "png/gliffy_128.png",
+      "iconAsTemplate": false,
+      "id": "pake-tray"
+    },
+    "security": {
+      "headers": {},
+      "csp": null
+    }
+  },
+  "build": {
+    "frontendDist": "../dist"
+  }
+}

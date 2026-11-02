@@ -5,3 +5,10 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Build output
+release/
+pake/dist/
+pake/src-tauri/target/
+pake/src-tauri/gen/
+pake/src-tauri/permissions/
